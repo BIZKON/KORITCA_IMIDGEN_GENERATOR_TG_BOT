@@ -1,32 +1,32 @@
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-green-100 text-green-700",
-  paused: "bg-yellow-100 text-yellow-700",
-  error: "bg-red-100 text-red-700",
-  parsed: "bg-gray-100 text-gray-700",
-  analyzed: "bg-blue-100 text-blue-700",
-  rejected: "bg-red-100 text-red-700",
-  rewriting: "bg-purple-100 text-purple-700",
-  rewritten: "bg-purple-100 text-purple-700",
-  prompting: "bg-indigo-100 text-indigo-700",
-  prompted: "bg-indigo-100 text-indigo-700",
-  generating: "bg-orange-100 text-orange-700",
-  generated: "bg-orange-100 text-orange-700",
-  ready: "bg-green-100 text-green-700",
-  queued: "bg-blue-100 text-blue-700",
-  published: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-700",
-  skipped: "bg-gray-100 text-gray-500",
-  scheduled: "bg-blue-100 text-blue-700",
-  posted: "bg-green-100 text-green-700",
-  completed: "bg-green-100 text-green-700",
-  started: "bg-yellow-100 text-yellow-700",
+const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  active: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  paused: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" },
+  error: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
+  parsed: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-700" },
+  analyzed: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  rejected: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
+  rewriting: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
+  rewritten: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
+  prompting: { bg: "bg-indigo-50", border: "border-indigo-200", text: "text-indigo-700" },
+  prompted: { bg: "bg-indigo-50", border: "border-indigo-200", text: "text-indigo-700" },
+  generating: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
+  generated: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
+  ready: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  queued: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  published: { bg: "bg-green-50", border: "border-green-200", text: "text-green-800" },
+  failed: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
+  skipped: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" },
+  scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  posted: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  completed: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  started: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" },
 };
 
 export default function StatusBadge({ status }: { status: string }) {
-  const color = STATUS_COLORS[status] || "bg-gray-100 text-gray-600";
+  const color = STATUS_COLORS[status] || { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" };
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${color}`}
+      className={`inline-block px-3.5 py-1.5 rounded-lg text-xs font-semibold border ${color.bg} ${color.border} ${color.text}`}
     >
       {status}
     </span>

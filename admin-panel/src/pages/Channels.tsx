@@ -8,7 +8,7 @@ import {
 } from "../lib/api";
 import { useApi } from "../hooks/useApi";
 import StatusBadge from "../components/StatusBadge";
-import { Plus, Trash2, Pause, Play, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Pause, Play, RefreshCw, Radio } from "lucide-react";
 
 export default function Channels() {
   const { data: channels, loading, refetch } = useApi(getChannels);
@@ -41,128 +41,152 @@ export default function Channels() {
     refetch();
   }
 
-  if (loading) return <div className="text-gray-500">Loading...</div>;
+  if (loading) return <div className="text-orange-500 text-center py-12">Загрузка каналов...</div>;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Каналы</h1>
-        <div className="flex gap-2">
-          <button onClick={refetch} className="text-gray-400 hover:text-gray-600">
-            <RefreshCw size={18} />
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Твои каналы</h1>
+          <p className="text-gray-600 mt-1">Управляй источниками контента</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={refetch} 
+            className="p-3 rounded-xl bg-white border border-orange-200 hover:bg-orange-50 transition-colors shadow-sm"
+          >
+            <RefreshCw size={20} className="text-orange-600" />
           </button>
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-1 px-3 py-1.5 bg-cookie-500 text-white rounded-lg text-sm hover:bg-cookie-600"
+            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-400 to-orange-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all active:scale-95"
           >
-            <Plus size={16} /> Добавить
+            <Plus size={18} /> Добавить канал
           </button>
         </div>
       </div>
 
       {/* Add form */}
       {showAdd && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-          <div className="flex gap-3">
+        <div className="bg-white rounded-2xl border border-orange-200 p-6 mb-6 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-900 mb-4">Новый канал</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
-              placeholder="username (без @)"
-              className="flex-1 px-3 py-2 border rounded-lg text-sm"
+              placeholder="Юзернейм (без @)"
+              className="px-4 py-3 border border-orange-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Название (опционально)"
-              className="flex-1 px-3 py-2 border rounded-lg text-sm"
+              className="px-4 py-3 border border-orange-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
+          </div>
+          <div className="flex gap-3 mt-4">
             <button
               onClick={handleAdd}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600"
+              className="px-5 py-2 bg-gradient-to-r from-green-400 to-green-500 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all"
             >
               Добавить
+            </button>
+            <button
+              onClick={() => setShowAdd(false)}
+              className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+            >
+              Отмена
             </button>
           </div>
         </div>
       )}
 
-      {/* Channels table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-left text-gray-500">
-              <th className="px-4 py-3 font-medium">Канал</th>
-              <th className="px-4 py-3 font-medium">Статус</th>
-              <th className="px-4 py-3 font-medium">Score</th>
-              <th className="px-4 py-3 font-medium">Посты</th>
-              <th className="px-4 py-3 font-medium">Парсинг</th>
-              <th className="px-4 py-3 font-medium">Действия</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {channels?.map((ch) => (
-              <tr key={ch.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">
-                    @{ch.username}
-                  </div>
-                  {ch.title && (
-                    <div className="text-xs text-gray-400">{ch.title}</div>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={ch.status} />
-                  {ch.error_message && (
-                    <div className="text-xs text-red-500 mt-1 max-w-[200px] truncate">
-                      {ch.error_message}
+      {/* Channels grid */}
+      {(!channels || channels.length === 0) ? (
+        <div className="bg-white rounded-2xl border border-orange-100 p-12 text-center shadow-sm">
+          <Radio size={40} className="text-orange-300 mx-auto mb-3" />
+          <p className="text-gray-600">Каналов пока нет</p>
+          <p className="text-sm text-gray-500 mt-1">Добавьте первый канал, чтобы начать</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {channels?.map((ch) => (
+            <div
+              key={ch.id}
+              className="bg-white rounded-2xl border border-orange-100 p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-gradient-to-br from-orange-100 to-yellow-100 rounded-lg">
+                      <Radio size={18} className="text-orange-600" />
                     </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-mono">{ch.similarity_score}</td>
-                <td className="px-4 py-3">
-                  <span className="text-gray-600">{ch.posts_found}</span>
-                  <span className="text-gray-300"> / </span>
-                  <span className="text-green-600">{ch.posts_relevant}</span>
-                </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">
-                  {ch.last_parsed_at
-                    ? new Date(ch.last_parsed_at).toLocaleString("ru")
-                    : "never"}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleToggle(ch)}
-                      className="p-1.5 rounded hover:bg-gray-100"
-                      title={ch.status === "active" ? "Pause" : "Resume"}
-                    >
-                      {ch.status === "active" ? (
-                        <Pause size={14} className="text-yellow-500" />
-                      ) : (
-                        <Play size={14} className="text-green-500" />
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">@{ch.username}</h3>
+                      {ch.title && (
+                        <p className="text-sm text-gray-600">{ch.title}</p>
                       )}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(ch)}
-                      className="p-1.5 rounded hover:bg-gray-100"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} className="text-red-400" />
-                    </button>
+                    </div>
                   </div>
-                </td>
-              </tr>
-            ))}
-            {(!channels || channels.length === 0) && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                  Каналов пока нет. Нажмите "Добавить".
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+                <StatusBadge status={ch.status} />
+              </div>
+
+              {ch.error_message && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700">
+                  {ch.error_message}
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-4 mb-4 py-4 border-t border-b border-orange-100">
+                <div>
+                  <p className="text-xs text-gray-600">Похожесть</p>
+                  <p className="text-2xl font-bold text-orange-600">{ch.similarity_score}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Посты найдено / релевантно</p>
+                  <p className="text-2xl font-bold text-gray-900">{ch.posts_found} <span className="text-lg text-gray-400">/</span> <span className="text-green-600">{ch.posts_relevant}</span></p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Последний парсинг</p>
+                  <p className="text-sm font-medium text-gray-700">
+                    {ch.last_parsed_at
+                      ? new Date(ch.last_parsed_at).toLocaleString("ru").split(",")[0]
+                      : "никогда"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleToggle(ch)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    ch.status === "active"
+                      ? "bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200"
+                      : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                  }`}
+                >
+                  {ch.status === "active" ? (
+                    <>
+                      <Pause size={14} /> Приостановить
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} /> Возобновить
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDelete(ch)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-sm font-medium transition-all"
+                >
+                  <Trash2 size={14} /> Удалить
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

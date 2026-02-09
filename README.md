@@ -1,16 +1,18 @@
-# Пряничная школа — Контент-пайплайн + Админ-панель
+# 🍪 ИМИДЖЕН — Контент-пайплайн + Админ-панель
 
 Автоматизированный контент-пайплайн для Telegram-бота "Пряничная школа":
-парсинг ТГ-каналов -> AI-анализ -> рерайт -> генерация промпта -> Imagen 4 -> автопост.
+парсинг ТГ-каналов → AI-анализ → рерайт → генерация промпта → Imagen 4 → автопост.
+
+**Админ-панель переработана в стиле бренда КОРИЦА FAMILY: теплая, уютная, профессиональная.** 🎨
 
 ## Архитектура
 
 ```
-TG-каналы -> Парсер -> AI Score -> Рерайт -> Промпт EN -> Imagen 4 -> Автопост
-                                                                         |
-                                                              Telegram Bot (webhook)
-                                                              Mini App (генерация)
-                                                              Админ-панель (React)
+TG-каналы → Парсер → AI Score → Рерайт → Промпт EN → Imagen 4 → Автопост
+                                                                    ↓
+                                                    Telegram Bot (webhook)
+                                                    Mini App (генерация)
+                                                    Админ-панель (React + Vite)
 ```
 
 ## Структура проекта
@@ -120,11 +122,37 @@ ALTER DATABASE postgres SET app.settings.cron_secret = 'your-cron-secret';
 
 ```bash
 cd admin-panel
-cp .env.example .env   # Заполнить VITE_API_BASE и VITE_ADMIN_TOKEN
+cp .env.example .env   # Заполнить VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY
 npm install
-npm run dev            # http://localhost:3001
+npm run dev            # http://localhost:5173
 npm run build          # Production build
 ```
+
+## 🎨 Дизайн Админ-Панели
+
+Админ-панель полностью переработана вдохновляясь дизайном вашего бренда **КОРИЦА FAMILY**:
+
+### Цветовая схема
+- **Primary**: `#fb923c` — теплый оранжевый (действия, акценты)
+- **Gradients**: Мягкие оранжевые градиенты для кнопок
+- **Background**: Белый с оранжевым оттенком (`#fff7ed`)
+- **Нейтралы**: Серые тона для текста и вспомогательных элементов
+
+### Компоненты
+- ✅ **Карточки**: `rounded-2xl` с мягкой оранжевой границей
+- ✅ **Кнопки**: Градиентный фон с микро-интеракциями
+- ✅ **Badges**: Border + soft background для статусов
+- ✅ **Inputs**: Оранжевая обводка при focus
+
+### Страницы
+- 📊 **Dashboard** — контрольная панель со статистикой
+- 📡 **Channels** — управление источниками контента
+- 🔄 **Pipeline** — отслеживание постов в обработке
+- ⏰ **Queue** — очередь публикаций
+- ⚙️ **Config** — настройки системы
+- 📋 **Logs** — история всех операций
+
+**Смотрите подробнее**: `admin-panel/DESIGN.md` и `FRONTEND_DESIGN.md`
 
 ## Edge Functions (13 шт.)
 
@@ -180,7 +208,47 @@ npm run build          # Production build
 
 Любой текст без "/" -> генерация изображения по описанию.
 
-## Стоимость
+## 🚀 Деплой
+
+### Админ-панель на Vercel (Рекомендуется)
+
+```bash
+cd admin-panel
+npm install -g vercel
+vercel login
+vercel deploy --prod
+```
+
+### Админ-панель на Netlify
+
+```bash
+cd admin-panel
+npm install -g netlify-cli
+netlify login
+netlify deploy --prod --dir=dist
+```
+
+### Edge Functions
+
+```bash
+supabase functions deploy --project-id <YOUR_PROJECT_ID>
+```
+
+**Полный гайд**: смотрите `DEPLOYMENT_GUIDE.md`
+
+---
+
+## 📚 Документация
+
+| Файл | Описание |
+|------|----------|
+| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Полный гайд по деплою (Backend + Frontend) |
+| [FRONTEND_DESIGN.md](./FRONTEND_DESIGN.md) | Описание дизайна админ-панели и изменений |
+| [admin-panel/DESIGN.md](./admin-panel/DESIGN.md) | Гайдлайны для разработки компонентов |
+
+---
+
+## 📊 Стоимость
 
 | Этап | API | Стоимость |
 |------|-----|-----------|
@@ -188,6 +256,59 @@ npm run build          # Production build
 | Рерайт | Gemini 2.5 Flash | ~$0.002 |
 | Промпт | Gemini 2.5 Flash | ~$0.002 |
 | Карточка | Imagen 4 Fast | ~$0.02 |
-| **Итого** | | **~$0.025 (~2.5 RUB)** |
+| **Итого за пост** | | **~$0.025 (~2.5 RUB)** |
 
-При 12 постах/неделю: ~$0.60/нед (~60 RUB).
+**При 12 постах/неделю**: ~$0.60/нед (~60 RUB)
+
+---
+
+## ✨ Что нового
+
+### 🎨 Полный редизайн админ-панели
+- ✅ Новая цветовая схема в стиле КОРИЦА FAMILY
+- ✅ Красивые карточки вместо таблиц
+- ✅ Улучшенные интеракции и микро-анимации
+- ✅ Лучше организованная информация
+- ✅ Responsive дизайн для всех устройств
+
+### 🛠️ Технические улучшения
+- ✅ React 19 + Vite (быстрая разработка)
+- ✅ Tailwind CSS для стилизации
+- ✅ SWR для кэширования данных
+- ✅ Lucide React для иконок
+- ✅ TypeScript для типобезопасности
+
+---
+
+## 📋 Быстрая проверка
+
+```bash
+# 1. Проверить админ-панель локально
+cd admin-panel
+npm install
+npm run dev
+# Откройте http://localhost:5173
+
+# 2. Проверить сборку
+npm run build
+ls dist/  # должен содержать index.html, assets/ и т.д.
+
+# 3. Проверить API
+curl -X GET https://<project-id>.supabase.co/functions/v1/admin-api \
+  -H "Authorization: Bearer <anon-key>"
+```
+
+---
+
+## 🐛 Решение проблем
+
+| Проблема | Решение |
+|----------|---------|
+| Admin Panel не загружается | Проверьте DevTools → Console, переменные окружения |
+| Edge Function ошибка | Проверьте Supabase → Functions → Logs |
+| Telegram webhook не работает | Выполните setWebhook еще раз, проверьте HTTPS |
+| Изображения не генерируются | Проверьте ATLASCLOUD_API_KEY и лимиты API |
+
+---
+
+## 🎓 Структура код
