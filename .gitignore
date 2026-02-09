@@ -1,0 +1,17 @@
+# Environment
+.env
+.env.local
+
+# Supabase
+supabase/.temp/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Deno
+.deno/
