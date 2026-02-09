@@ -7,6 +7,7 @@ import {
   Settings,
   ScrollText,
   Sparkles,
+  Palette,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { to: "/queue", icon: CalendarClock, label: "Очередь" },
   { to: "/config", icon: Settings, label: "Настройки" },
   { to: "/logs", icon: ScrollText, label: "Логи" },
+  { to: "/test", icon: Palette, label: "Дизайн Тест" },
 ];
 
 export default function Layout() {

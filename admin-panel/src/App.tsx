@@ -6,6 +6,7 @@ import Pipeline from "./pages/Pipeline";
 import Queue from "./pages/Queue";
 import Config from "./pages/Config";
 import Logs from "./pages/Logs";
+import Test from "./pages/Test";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="queue" element={<Queue />} />
         <Route path="config" element={<Config />} />
         <Route path="logs" element={<Logs />} />
+        <Route path="test" element={<Test />} />
       </Route>
     </Routes>
   );
