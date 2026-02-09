@@ -1,69 +1,14 @@
 import { supabase } from "../_shared/supabase.ts";
-import { getGoogleAccessToken } from "../_shared/google-auth.ts";
+import { getTaskStatus, VIDEO_COSTS } from "../_shared/atlas-cloud.ts";
 
 /**
  * Проверка статуса генерации видео (polling)
+ * Использует AtlasCloud getTask API
  *
  * GET/POST с параметрами:
  *   generation_id: string (UUID)  — ID записи в generations
- *   operation_name?: string       — или напрямую operation name
+ *   task_id?: string              — или напрямую AtlasCloud task ID
  */
-
-const MODEL_COSTS: Record<string, number> = {
-  veo31_fast: 0.15,
-  veo31: 0.35,
-};
-
-/**
- * Проверяет статус LRO (Long Running Operation) в Vertex AI
- */
-async function checkOperation(
-  operationName: string,
-  accessToken: string
-): Promise<{
-  done: boolean;
-  videoBase64?: string;
-  mimeType?: string;
-  error?: string;
-}> {
-  const location = Deno.env.get("GOOGLE_CLOUD_LOCATION") || "us-central1";
-
-  const response = await fetch(
-    `https://${location}-aiplatform.googleapis.com/v1/${operationName}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`LRO check error: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-
-  if (data.error) {
-    return { done: true, error: data.error.message || JSON.stringify(data.error) };
-  }
-
-  if (!data.done) {
-    return { done: false };
-  }
-
-  // Видео готово
-  const video = data.response?.predictions?.[0];
-  if (!video?.bytesBase64Encoded) {
-    return { done: true, error: "No video in response" };
-  }
-
-  return {
-    done: true,
-    videoBase64: video.bytesBase64Encoded,
-    mimeType: video.mimeType || "video/mp4",
-  };
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -79,23 +24,23 @@ Deno.serve(async (req) => {
 
   try {
     let generationId: string | null = null;
-    let operationName: string | null = null;
+    let taskId: string | null = null;
 
     if (req.method === "POST") {
       const body = await req.json();
       generationId = body.generation_id || null;
-      operationName = body.operation_name || null;
+      taskId = body.task_id || null;
     } else {
       const url = new URL(req.url);
       generationId = url.searchParams.get("generation_id");
-      operationName = url.searchParams.get("operation_name");
+      taskId = url.searchParams.get("task_id");
     }
 
-    // Получаем operation_name из БД если передан generation_id
-    if (generationId && !operationName) {
+    // Получаем task_id из БД если передан generation_id
+    if (generationId && !taskId) {
       const { data: gen } = await supabase
         .from("generations")
-        .select("operation_name, status")
+        .select("operation_name, status, video_url, error_message")
         .eq("id", generationId)
         .single();
 
@@ -108,128 +53,92 @@ Deno.serve(async (req) => {
 
       // Уже завершено
       if (gen.status === "completed" || gen.status === "failed") {
-        const { data: fullGen } = await supabase
-          .from("generations")
-          .select("*")
-          .eq("id", generationId)
-          .single();
-
         return Response.json(
-          {
-            status: fullGen?.status,
-            video_url: fullGen?.video_url,
-            error: fullGen?.error_message,
-          },
+          { status: gen.status, video_url: gen.video_url, error: gen.error_message },
           { headers: { "Access-Control-Allow-Origin": "*" } }
         );
       }
 
-      operationName = gen.operation_name;
+      taskId = gen.operation_name;
     }
 
-    if (!operationName) {
+    if (!taskId) {
       return Response.json(
-        { error: "generation_id or operation_name required" },
+        { error: "generation_id or task_id required" },
         { status: 400, headers: { "Access-Control-Allow-Origin": "*" } }
       );
     }
 
-    const accessToken = await getGoogleAccessToken();
-    const result = await checkOperation(operationName, accessToken);
+    // Проверяем статус через AtlasCloud
+    const result = await getTaskStatus(taskId);
 
-    if (!result.done) {
+    // Ещё генерируется
+    if (result.status !== "completed" && result.status !== "failed" && (!result.outputs || result.outputs.length === 0)) {
       return Response.json(
         { status: "generating", message: "Still processing..." },
         { headers: { "Access-Control-Allow-Origin": "*" } }
       );
     }
 
-    // Ошибка генерации
-    if (result.error) {
+    // Ошибка
+    if (result.status === "failed") {
       if (generationId) {
         await supabase
           .from("generations")
           .update({
             status: "failed",
-            error_message: result.error,
+            error_message: "Video generation failed",
             completed_at: new Date().toISOString(),
           })
           .eq("id", generationId);
       }
 
       return Response.json(
-        { status: "failed", error: result.error },
+        { status: "failed", error: "Video generation failed" },
         { headers: { "Access-Control-Allow-Origin": "*" } }
       );
     }
 
-    // Видео готово — сохраняем
-    if (result.videoBase64) {
-      let videoUrl = "";
-
-      if (generationId) {
-        // Получаем telegram_id для пути
-        const { data: gen } = await supabase
-          .from("generations")
-          .select("telegram_id, model")
-          .eq("id", generationId)
-          .single();
-
-        const ext = result.mimeType?.includes("mp4") ? "mp4" : "webm";
-        const fileName = `users/${gen?.telegram_id || "unknown"}/${generationId}.${ext}`;
-        const videoData = Uint8Array.from(atob(result.videoBase64), (c) =>
-          c.charCodeAt(0)
-        );
-
-        const { error: uploadError } = await supabase.storage
-          .from("generations")
-          .upload(fileName, videoData, {
-            contentType: result.mimeType || "video/mp4",
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Upload failed: ${uploadError.message}`);
-        }
-
-        const { data: publicUrl } = supabase.storage
-          .from("generations")
-          .getPublicUrl(fileName);
-
-        videoUrl = publicUrl.publicUrl;
-        const cost = MODEL_COSTS[gen?.model || "veo31_fast"] || 0.15;
-
-        await supabase
-          .from("generations")
-          .update({
-            status: "completed",
-            video_url: videoUrl,
-            cost_usd: cost,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", generationId);
-      }
-
+    // Видео готово — URL в outputs[]
+    const videoUrl = result.outputs?.[0];
+    if (!videoUrl) {
       return Response.json(
-        { status: "completed", video_url: videoUrl },
+        { status: "generating", message: "Waiting for output..." },
         { headers: { "Access-Control-Allow-Origin": "*" } }
       );
+    }
+
+    // Обновляем запись в БД
+    if (generationId) {
+      const { data: gen } = await supabase
+        .from("generations")
+        .select("model")
+        .eq("id", generationId)
+        .single();
+
+      const cost = VIDEO_COSTS[gen?.model || ""] || 0.15;
+
+      await supabase
+        .from("generations")
+        .update({
+          status: "completed",
+          video_url: videoUrl,
+          cost_usd: cost * 5, // cost per second * 5 seconds
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", generationId);
     }
 
     return Response.json(
-      { status: "unknown", message: "Unexpected state" },
+      { status: "completed", video_url: videoUrl },
       { headers: { "Access-Control-Allow-Origin": "*" } }
     );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("Check video status error:", errorMessage);
-
     return Response.json(
       { error: errorMessage },
-      {
-        status: 500,
-        headers: { "Access-Control-Allow-Origin": "*" },
-      }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 });

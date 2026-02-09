@@ -25,7 +25,7 @@ supabase/
     _shared/                       # Общие утилиты
       supabase.ts                  # Supabase client
       auth.ts                      # Авторизация (cron, admin, telegram)
-      google-auth.ts               # Google OAuth2 (JWT -> access token)
+      atlas-cloud.ts               # AtlasCloud API (Gemini, Imagen, Veo)
       config.ts                    # Pipeline config + logging
       telegram.ts                  # Telegram Bot API helper
     parse-channels/                # Парсинг t.me/s/ каналов
@@ -69,9 +69,7 @@ admin-panel/                       # React SPA для админ-панели
 ```
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
-GOOGLE_CLOUD_PROJECT_ID=...
-GOOGLE_CLOUD_LOCATION=us-central1
-GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"..."}
+ATLASCLOUD_API_KEY=...          # https://www.atlascloud.ai (Gemini, Imagen 4, Veo 3.1)
 TELEGRAM_BOT_TOKEN=...
 BOT_USERNAME=your_bot_username
 TELEGRAM_CHANNEL_ID=-100...

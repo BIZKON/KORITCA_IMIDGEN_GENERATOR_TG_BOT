@@ -1,115 +1,32 @@
 import { supabase } from "../_shared/supabase.ts";
-import { getGoogleAccessToken, vertexAiUrl } from "../_shared/google-auth.ts";
+import {
+  prompt as aiPrompt,
+  generateVideo,
+  CHAT_MODELS,
+  VIDEO_MODELS,
+} from "../_shared/atlas-cloud.ts";
 
 /**
- * Генерация видео для пользователей через Veo (Vertex AI)
- * Видео генерируется асинхронно — возвращает operation_name для polling
+ * Генерация видео для пользователей через AtlasCloud (Veo 3.1)
+ * Видео генерируется асинхронно — возвращает task ID для polling
  *
  * POST body:
  *   telegram_id: number
- *   user_id: string (UUID)
  *   prompt_ru: string
  *   aspect_ratio?: '16:9' | '9:16'
  *   model?: 'veo31_fast' | 'veo31'
  */
 
-const MODEL_IDS: Record<string, string> = {
-  veo31_fast: "veo-3.1-fast-generate-001",
-  veo31: "veo-3.1-generate-001",
-};
-
-const MODEL_COSTS: Record<string, number> = {
-  veo31_fast: 0.15,
-  veo31: 0.35,
-};
-
-/**
- * Переводит RU промпт в EN для видео
- */
-async function translateVideoPrompt(
-  promptRu: string,
-  accessToken: string
-): Promise<string> {
-  const systemPrompt = `Ты — переводчик промптов для генерации видео.
-Переведи описание сцены с пряниками с русского на английский.
-Добавь кинематографические детали:
-- Camera movement (slow pan, dolly in, static)
-- Atmosphere (cozy, warm, festive)
-- Lighting (soft warm, golden hour, studio)
-- Duration hint (short, smooth transition)
-
+async function translateVideoPrompt(promptRu: string): Promise<string> {
+  return aiPrompt(
+    CHAT_MODELS["gemini-flash"],
+    `Переведи описание сцены с пряниками с русского на английский для генерации видео.
+Добавь кинематографические детали: camera movement, atmosphere, lighting.
 Ответь ТОЛЬКО переведённым промптом (30-60 слов).
 
-Русский текст: ${promptRu}`;
-
-  const response = await fetch(vertexAiUrl("gemini-2.5-flash"), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: systemPrompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 150 },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Gemini translate error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || promptRu;
-}
-
-/**
- * Запуск асинхронной генерации видео через Veo
- */
-async function startVideoGeneration(
-  promptEn: string,
-  aspectRatio: string,
-  model: string,
-  accessToken: string
-): Promise<string> {
-  const modelId = MODEL_IDS[model] || MODEL_IDS.veo31_fast;
-  const project = Deno.env.get("GOOGLE_CLOUD_PROJECT_ID")!;
-  const location = Deno.env.get("GOOGLE_CLOUD_LOCATION") || "us-central1";
-
-  // Veo использует async predict (generateVideo)
-  const response = await fetch(
-    `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:predictLongRunning`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        instances: [{ prompt: promptEn }],
-        parameters: {
-          aspectRatio,
-          sampleCount: 1,
-          durationSeconds: 5,
-          personGeneration: "allow_all",
-        },
-      }),
-    }
+Русский текст: ${promptRu}`,
+    { temperature: 0.3, max_tokens: 150 }
   );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Veo API error: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-
-  // Возвращает LRO operation name
-  const operationName = data.name;
-  if (!operationName) {
-    throw new Error("No operation name returned: " + JSON.stringify(data));
-  }
-
-  return operationName;
 }
 
 Deno.serve(async (req) => {
@@ -157,13 +74,8 @@ Deno.serve(async (req) => {
 
     // Сброс дневного лимита
     const now = new Date();
-    const lastGen = user.last_generation_at
-      ? new Date(user.last_generation_at)
-      : null;
-    const isNewDay =
-      !lastGen ||
-      lastGen.toISOString().slice(0, 10) !== now.toISOString().slice(0, 10);
-
+    const lastGen = user.last_generation_at ? new Date(user.last_generation_at) : null;
+    const isNewDay = !lastGen || lastGen.toISOString().slice(0, 10) !== now.toISOString().slice(0, 10);
     const todayCount = isNewDay ? 0 : user.generations_today;
 
     if (todayCount >= user.daily_limit && !user.is_admin) {
@@ -173,18 +85,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    const accessToken = await getGoogleAccessToken();
-
     // Переводим промпт
-    const promptEn = await translateVideoPrompt(prompt_ru, accessToken);
+    const promptEn = await translateVideoPrompt(prompt_ru);
+
+    // Определяем модель AtlasCloud
+    const atlasModel = VIDEO_MODELS[model as keyof typeof VIDEO_MODELS] || VIDEO_MODELS.veo31_fast;
 
     // Запускаем генерацию (async)
-    const operationName = await startVideoGeneration(
-      promptEn,
+    const videoResult = await generateVideo(atlasModel, promptEn, {
       aspect_ratio,
-      model,
-      accessToken
-    );
+      duration: 5,
+      generate_audio: false,
+    });
+
+    // AtlasCloud возвращает task ID для polling
+    const taskId = videoResult.id;
+    if (!taskId) {
+      throw new Error("No task ID returned: " + JSON.stringify(videoResult));
+    }
 
     // Создаём запись генерации
     const { data: generation } = await supabase
@@ -195,10 +113,10 @@ Deno.serve(async (req) => {
         prompt_ru,
         prompt_en: promptEn,
         media_type: "video",
-        model,
+        model: atlasModel,
         aspect_ratio,
         status: "generating",
-        operation_name: operationName,
+        operation_name: taskId,  // Сохраняем AtlasCloud task ID
       })
       .select()
       .single();
@@ -217,25 +135,19 @@ Deno.serve(async (req) => {
     return Response.json(
       {
         generation_id: generation?.id,
-        operation_name: operationName,
+        task_id: taskId,
         status: "generating",
         prompt_en: promptEn,
         message: "Video generation started. Use check-video-status to poll.",
       },
-      {
-        headers: { "Access-Control-Allow-Origin": "*" },
-      }
+      { headers: { "Access-Control-Allow-Origin": "*" } }
     );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("Generate video error:", errorMessage);
-
     return Response.json(
       { error: errorMessage },
-      {
-        status: 500,
-        headers: { "Access-Control-Allow-Origin": "*" },
-      }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 });

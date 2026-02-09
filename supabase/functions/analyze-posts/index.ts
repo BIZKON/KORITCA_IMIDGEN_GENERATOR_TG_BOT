@@ -1,6 +1,6 @@
 import { supabase } from "../_shared/supabase.ts";
 import { verifyCronAuth, unauthorizedResponse } from "../_shared/auth.ts";
-import { getGoogleAccessToken, vertexAiUrl } from "../_shared/google-auth.ts";
+import { prompt, CHAT_MODELS } from "../_shared/atlas-cloud.ts";
 import { getConfig, logPipelineEvent } from "../_shared/config.ts";
 
 interface AnalysisResult {
@@ -32,49 +32,26 @@ const ANALYSIS_PROMPT = `Ты — эксперт по пряничному ис�
 }`;
 
 /**
- * Анализ поста через Gemini Flash — определяет релевантность
+ * Анализ поста через Gemini Flash (AtlasCloud)
  */
 async function analyzePost(
   text: string,
-  imageUrls: string[],
-  accessToken: string
+  imageUrls: string[]
 ): Promise<AnalysisResult> {
   const photoInfo =
     imageUrls.length > 0
       ? `Фото: ${imageUrls.length} шт.`
       : "Без фото";
 
-  const prompt = ANALYSIS_PROMPT
+  const userPrompt = ANALYSIS_PROMPT
     .replace("{text}", text)
     .replace("{photo_info}", photoInfo);
 
-  const response = await fetch(
-    vertexAiUrl("gemini-2.5-flash"),
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 500,
-          responseMimeType: "application/json",
-        },
-      }),
-    }
+  const resultText = await prompt(
+    CHAT_MODELS["gemini-flash"],
+    userPrompt,
+    { temperature: 0.1, max_tokens: 500, json_mode: true }
   );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-  const resultText =
-    data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
   try {
     return JSON.parse(resultText);
@@ -88,7 +65,6 @@ Deno.serve(async (req) => {
     return unauthorizedResponse();
   }
 
-  // Берём неанализированные посты (batch по 10)
   const { data: posts } = await supabase
     .from("parsed_posts")
     .select("*")
@@ -100,9 +76,7 @@ Deno.serve(async (req) => {
     return Response.json({ message: "No posts to analyze" });
   }
 
-  const accessToken = await getGoogleAccessToken();
   const minScore = await getConfig<number>("min_relevance_score", 70);
-
   const results = [];
 
   for (const post of posts) {
@@ -111,8 +85,7 @@ Deno.serve(async (req) => {
     try {
       const analysis = await analyzePost(
         post.original_text,
-        post.original_image_urls || [],
-        accessToken
+        post.original_image_urls || []
       );
 
       const newStatus =
@@ -130,7 +103,6 @@ Deno.serve(async (req) => {
         })
         .eq("id", post.id);
 
-      // Обновляем счётчик релевантных постов канала
       if (newStatus === "analyzed") {
         const { data: channel } = await supabase
           .from("monitored_channels")
@@ -153,37 +125,21 @@ Deno.serve(async (req) => {
         status: "completed",
         duration_ms: Date.now() - startTime,
         cost_usd: 0.001,
-        metadata: {
-          score: analysis.relevance_score,
-          status: newStatus,
-          categories: analysis.categories,
-        },
+        metadata: { score: analysis.relevance_score, status: newStatus },
       });
 
-      results.push({
-        id: post.id,
-        score: analysis.relevance_score,
-        status: newStatus,
-      });
+      results.push({ id: post.id, score: analysis.relevance_score, status: newStatus });
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : String(err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
 
       await supabase
         .from("parsed_posts")
-        .update({
-          pipeline_status: "failed",
-          error_message: errorMessage,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ pipeline_status: "failed", error_message: errorMessage, updated_at: new Date().toISOString() })
         .eq("id", post.id);
 
       await logPipelineEvent({
-        post_id: post.id,
-        stage: "analyze",
-        status: "failed",
-        duration_ms: Date.now() - startTime,
-        error: errorMessage,
+        post_id: post.id, stage: "analyze", status: "failed",
+        duration_ms: Date.now() - startTime, error: errorMessage,
       });
 
       results.push({ id: post.id, error: errorMessage });
